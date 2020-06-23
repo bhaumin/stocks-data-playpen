@@ -1,7 +1,6 @@
 from datetime import datetime, date, timedelta, timezone
 import time
 import requests
-import csv
 import utils
 import logging
 
