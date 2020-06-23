@@ -114,7 +114,7 @@ def main():
         default_start_date = (stock_last_date + td)
 
       start_date = custom_start_date if is_custom_period else default_start_date
-      date_to_use = yesterday if stock_symbol[0] == '^' or mkt == 'us' else today
+      date_to_use = yesterday if stock_symbol[0] == '^' and mkt == 'in' else today
       end_date = datetime(date_to_use.year, date_to_use.month, date_to_use.day, 21, 0, 0)
 
       if end_date < start_date:
@@ -123,7 +123,7 @@ def main():
       start_ts, end_ts = convert_date_to_ts(start_date), convert_date_to_ts(end_date)
       start_ts, end_ts = int(start_ts), int(end_ts)
 
-      logging.info('Fetching => mkt={mkt}, stock_symbol={stock_symbol}, start_date={start_date} ({start_ts}), end_date={end_date} ({end_ts})')
+      logging.info(f'Fetching => mkt={mkt}, stock_symbol={stock_symbol}, start_date={start_date} ({start_ts}), end_date={end_date} ({end_ts})')
 
       get_stock_data(stock_symbol, mkt, start_ts, end_ts)
 
