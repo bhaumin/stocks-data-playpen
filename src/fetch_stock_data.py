@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta, timezone
+import sys
 import time
 import requests
 import utils
@@ -93,8 +94,22 @@ def get_default_start_time_utc_str():
   return '13:30:00'
 
 
+def get_markets_to_process():
+  inputMkt = sys.argv[1:2] if len(sys.argv) > 1 else None
+  return utils.get_markets() if inputMkt is None else inputMkt
+
+
+def get_stocks_to_process(mkt):
+  inputStockSymbols = sys.argv[2:] if len(sys.argv) > 2 else None
+  return utils.get_stock_symbols(mkt) if inputStockSymbols is None else inputStockSymbols
+
+
 def main():
-  logging.basicConfig(filename='../logs/activity.log', format='%(asctime)s %(message)s', level=logging.DEBUG)
+  file_handler = logging.FileHandler(filename='../logs/activity.log')
+  stdout_handler = logging.StreamHandler(sys.stdout)
+  handlers = [file_handler, stdout_handler]
+  logging.basicConfig(handlers=handlers, format='%(asctime)s %(message)s', level=logging.INFO)
+
   is_custom_period = False
   custom_start_date_str = '1985-01-29'
   td = timedelta(days=1)
@@ -104,8 +119,8 @@ def main():
   default_start_time_str = get_default_start_time_utc_str()
   custom_start_date = parse_date_time(custom_start_date_str, default_start_time_str)
 
-  for mkt in utils.get_markets():
-    for stock_symbol in utils.get_stock_symbols(mkt):
+  for mkt in get_markets_to_process():
+    for stock_symbol in get_stocks_to_process(mkt):
       default_start_date = parse_date_time(get_default_start_date_str(), get_default_start_time_utc_str())
       stock_csv_path = get_csv_file_path(stock_symbol, mkt)
       stock_last_date = get_last_date(stock_csv_path)
