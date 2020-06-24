@@ -7,12 +7,16 @@ import logging
 
 
 def get_stock_data(stock_symbol, mkt, period_start, period_end):
-  URL_PREFIX = 'https://query1.finance.yahoo.com/v7/finance/download'
-  CSV_URL = f'{URL_PREFIX}/{stock_symbol}?period1={period_start}&period2={period_end}&interval=1d&events=history'
-  csv_file_path = get_csv_file_path(stock_symbol, mkt)
+  url_endpoint = f'https://query1.finance.yahoo.com/v7/finance/download/{stock_symbol}'
+  payload = {
+    'period1': period_start,
+    'period2': period_end,
+    'interval': '1d',
+    'events': 'history'
+  }
 
   with requests.Session() as s:
-    r = s.get(CSV_URL, allow_redirects=True)
+    r = s.get(url_endpoint, params=payload, allow_redirects=True)
 
     if r.status_code != 200:
       logging.warning(f'ERROR: status_code={r.status_code}, reason={r.reason}')
@@ -21,6 +25,7 @@ def get_stock_data(stock_symbol, mkt, period_start, period_end):
     decoded_content = r.content.decode('utf-8')
 
   try:
+    csv_file_path = get_csv_file_path(stock_symbol, mkt)
     f = open(csv_file_path)
 
     header_rest = decoded_content.split('\n', 1)
