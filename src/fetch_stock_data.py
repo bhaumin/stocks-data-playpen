@@ -1,4 +1,5 @@
 from datetime import datetime, date, timedelta, timezone
+from config import yfinance_base_url
 import sys
 import time
 import requests
@@ -7,7 +8,7 @@ import logging
 
 
 def get_stock_data(stock_symbol, mkt, period_start, period_end):
-  url_endpoint = f'https://query1.finance.yahoo.com/v7/finance/download/{stock_symbol}'
+  url_endpoint = f'{yfinance_base_url}/{stock_symbol}'
   payload = {
     'period1': period_start,
     'period2': period_end,
