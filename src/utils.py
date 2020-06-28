@@ -1,40 +1,53 @@
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, isdir, join
 from csv import DictReader
 from datetime import datetime
+from constants import *
+import time
+import logging
+
+
+def list_dirs(dir_path):
+  return [d for d in listdir(dir_path) if isdir(join(dir_path, d))]
 
 
 def list_files(dir_path):
   return [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
 
 
-def get_markets():
-  with open('../data/markets.txt') as f:
-    return [mkt.strip() for mkt in f.read().split('\n') if mkt.strip() != '']
-
-
-def get_stock_symbols(mkt):
-  with open(f'../data/symbols/{mkt}.txt') as f:
-    return [sym.strip() for sym in f.read().split('\n') if sym.strip() != '']
-
-
-def get_filename_without_ext(filename):
+def remove_filename_ext(filename):
   return '.'.join(filename.split('.')[0:-1])
 
 
-def parse_ohlcv_csv(csv_data):
+def parse_date_time(date_str, time_str='00:00:00'):
+  return datetime.strptime(f'{date_str} {time_str}', DATETIME_FORMAT)
+
+
+def convert_date_to_ts(dt):
+  return int(time.mktime(dt.timetuple()))
+
+
+def convert_ticker_to_coll(ticker):
+  return ticker.replace(INDEX_PREFIX_EXT, INDEX_PREFIX_INT)
+
+
+def parse_ohlcv_csv(csv_data, last_saved_date):
   csv_reader = DictReader(csv_data)
 
   error_count = 0
   records = []
   for row in csv_reader:
     if not is_data_valid(row):
-      # print(f'Error=>{row}')
       error_count += 1
       continue
 
+    new_date = datetime.fromisoformat(row['Date'])
+
+    if last_saved_date and new_date <= last_saved_date:
+      continue
+
     records.append({
-      'date': datetime.fromisoformat(row['Date']),
+      'date': new_date,
       'open': float(row['Open']),
       'high': float(row['High']),
       'low': float(row['Low']),
@@ -43,7 +56,7 @@ def parse_ohlcv_csv(csv_data):
       'volume': int(row['Volume'])
     })
 
-  print(f'Error counts => {error_count}')
+  logging.info(f'Error counts => {error_count}')
   return records
 
 
@@ -57,9 +70,7 @@ def is_data_valid(rec):
 
 
 def main():
-  print(get_markets())
-  print(get_stock_symbols('us'))
-  print(get_stock_symbols('in'))
+  pass
 
 
 if __name__ == "__main__":

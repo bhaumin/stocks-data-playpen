@@ -1,14 +1,57 @@
-from datetime import datetime, date, timedelta, timezone
-from config import yfinance_base_url
+from datetime import datetime, timedelta
+from config import yfinance_base_url, base_path
+from os.path import join
+from constants import *
+import utils
+import mdb
 import sys
 import time
 import requests
-import utils
 import logging
 
 
-def get_stock_data(stock_symbol, mkt, period_start, period_end):
-  url_endpoint = f'{yfinance_base_url}/{stock_symbol}'
+def main():
+  init_logging()
+
+  for mkt in get_markets_to_process():
+    for stock_ticker in get_stocks_to_process(mkt):
+      last_saved_date = get_last_date(mkt, stock_ticker)
+      start_date = calc_start_date(mkt, stock_ticker, last_saved_date)
+      end_date = calc_end_date(mkt, stock_ticker)
+
+      if end_date < start_date:
+        continue
+
+      start_ts, end_ts = utils.convert_date_to_ts(start_date), \
+        utils.convert_date_to_ts(end_date)
+
+      log_message = f'Fetching => mkt={mkt}, stock_ticker={stock_ticker},'
+      log_message += f' start_date={start_date} ({start_ts}),'
+      log_message += f' end_date={end_date} ({end_ts})'
+
+      logging.info(log_message)
+
+      new_data = fetch(mkt, stock_ticker, start_ts, end_ts)
+
+      if new_data:
+        save(mkt, stock_ticker, new_data, last_saved_date)
+
+      # make program wait for 0.5 sec to throttle the api calls
+      time.sleep(0.5)
+
+
+def init_logging():
+  file_handler = logging.FileHandler(filename=join(base_path, 'logs/activity.log'))
+  stdout_handler = logging.StreamHandler(sys.stdout)
+  handlers = [file_handler, stdout_handler]
+  logging.basicConfig(
+    handlers=handlers,
+    format='%(asctime)s %(message)s',
+    level=logging.INFO)
+
+
+def fetch(mkt, stock_ticker, period_start, period_end):
+  url_endpoint = f'{yfinance_base_url}/{stock_ticker}'
   payload = {
     'period1': period_start,
     'period2': period_end,
@@ -25,131 +68,68 @@ def get_stock_data(stock_symbol, mkt, period_start, period_end):
 
     decoded_content = r.content.decode('utf-8')
 
-  try:
-    csv_file_path = get_csv_file_path(stock_symbol, mkt)
-    f = open(csv_file_path)
-
-    header_rest = decoded_content.split('\n', 1)
-
-    if len(header_rest) < 2:
-      return
-
-    new_data = header_rest[1]
-    append_stock_data(csv_file_path, new_data)
-    f.close()
-  except FileNotFoundError:
-    all_data = decoded_content
-    write_stock_data(csv_file_path, all_data)
+  return decoded_content.split('\n')
 
 
-def write_stock_data(file_path, data):
-  with open(file_path, 'w') as f:
-    f.write(data)
+def save(mkt, stock_ticker, data, last_saved_date):
+  coll_name = utils.convert_ticker_to_coll(stock_ticker)
+  docs_to_save = utils.parse_ohlcv_csv(data, last_saved_date)
+  resp = mdb.write_many_records(mdb.db_to_use(mkt), coll_name, docs_to_save)
+  logging.info(f'Inserted: {len(resp.inserted_ids)} records')
 
 
-def append_stock_data(file_path, data):
-  with open(file_path, 'a+') as f:
-    f.seek(0)
-
-    # If file is not empty then append '\n'
-    content = f.read(100)
-    if len(content) > 0:
-      f.write('\n')
-
-    # Append text at the end of file
-    f.write(data)
+def get_last_date(mkt, stock_ticker):
+  coll_name = utils.convert_ticker_to_coll(stock_ticker)
+  last_record = mdb.get_latest_record(mdb.db_to_use(mkt), coll_name)
+  return last_record['date'] if last_record else None
 
 
-def get_last_date(file_path):
-  try:
-    with open(file_path) as f:
-      all_lines = f.readlines()
+def calc_start_date(mkt, stock_ticker, last_saved_date):
+  td = timedelta(days=1)
 
-      if len(all_lines) < 2:
-        return None
-
-    last_line = all_lines[-1]
-    last_date_str = last_line.split(',', 1)[0]
-    time_str = get_default_start_time_utc_str()
-    return datetime.strptime(f'{last_date_str} {time_str}', get_datetime_parse_format())
-  except EnvironmentError:
-    return None
+  return (last_saved_date + td) \
+    if last_saved_date \
+    else utils.parse_date_time(DEFAULT_START_DATE, DEFAULT_START_TIME)
 
 
-def convert_date_to_ts(d):
-  return time.mktime(d.timetuple())
+def calc_end_date(mkt, stock_ticker):
+  today = datetime.utcnow()
+  td = timedelta(days=1)
 
+  # TODO Remove this special logic and just use today
+  end_date_to_use = (today - td) \
+    if (mkt == IN_MKT and stock_ticker[0] == INDEX_PREFIX_EXT) \
+    else today
 
-def get_csv_file_path(stock_symbol, mkt='us'):
-  return f'../data/csv/{mkt}/{stock_symbol}.csv'
-
-
-def get_datetime_parse_format():
-  return '%Y-%m-%d %H:%M:%S'
-
-
-def parse_date_time(date_str, time_str='00:00:00'):
-  return datetime.strptime(f'{date_str} {time_str}', get_datetime_parse_format())
-
-
-def get_default_start_date_str():
-  return '1927-12-30'
-
-
-def get_default_start_time_utc_str():
-  return '13:30:00'
+  return datetime(
+    end_date_to_use.year,
+    end_date_to_use.month,
+    end_date_to_use.day,
+    21, 0, 0)
 
 
 def get_markets_to_process():
-  inputMkt = sys.argv[1:2] if len(sys.argv) > 1 else None
-  return utils.get_markets() if inputMkt is None else inputMkt
+  if len(sys.argv) > 1:
+    return sys.argv[1:2]
+
+  results = mdb.find_records(DB_NAME_META, 'markets')
+  return [r['name'] for r in results]
 
 
 def get_stocks_to_process(mkt):
-  inputStockSymbols = sys.argv[2:] if len(sys.argv) > 2 else None
-  return utils.get_stock_symbols(mkt) if inputStockSymbols is None else inputStockSymbols
+  if len(sys.argv) > 2:
+    return sys.argv[2:]
 
+  filter = { 'market': mkt }
+  projection = { '_id': 0, 'ticker': 1 }
+  sort = [( 'ticker', 1 )]
 
-def main():
-  file_handler = logging.FileHandler(filename='../logs/activity.log')
-  stdout_handler = logging.StreamHandler(sys.stdout)
-  handlers = [file_handler, stdout_handler]
-  logging.basicConfig(handlers=handlers, format='%(asctime)s %(message)s', level=logging.INFO)
+  results = mdb.find_records(DB_NAME_META, 'stocks',
+    filter=filter,
+    projection=projection,
+    sort=sort)
 
-  is_custom_period = False
-  custom_start_date_str = '1985-01-29'
-  td = timedelta(days=1)
-  today = datetime.utcnow()
-  yesterday = today - td
-
-  default_start_time_str = get_default_start_time_utc_str()
-  custom_start_date = parse_date_time(custom_start_date_str, default_start_time_str)
-
-  for mkt in get_markets_to_process():
-    for stock_symbol in get_stocks_to_process(mkt):
-      default_start_date = parse_date_time(get_default_start_date_str(), get_default_start_time_utc_str())
-      stock_csv_path = get_csv_file_path(stock_symbol, mkt)
-      stock_last_date = get_last_date(stock_csv_path)
-
-      if stock_last_date:
-        default_start_date = (stock_last_date + td)
-
-      start_date = custom_start_date if is_custom_period else default_start_date
-      date_to_use = yesterday if stock_symbol[0] == '^' and mkt == 'in' else today
-      end_date = datetime(date_to_use.year, date_to_use.month, date_to_use.day, 21, 0, 0)
-
-      if end_date < start_date:
-        continue
-
-      start_ts, end_ts = convert_date_to_ts(start_date), convert_date_to_ts(end_date)
-      start_ts, end_ts = int(start_ts), int(end_ts)
-
-      logging.info(f'Fetching => mkt={mkt}, stock_symbol={stock_symbol}, start_date={start_date} ({start_ts}), end_date={end_date} ({end_ts})')
-
-      get_stock_data(stock_symbol, mkt, start_ts, end_ts)
-
-      # make program wait for 0.5 sec to throttle the api calls
-      time.sleep(0.5)
+  return [r['ticker'] for r in results]
 
 
 if __name__ == "__main__":

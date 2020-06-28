@@ -1,14 +1,14 @@
 from pymongo import MongoClient, ASCENDING, DESCENDING
-from bson.objectid import ObjectId
 import ssl
-from config import *
+from config import mdb_url
+from constants import *
 
 
 client = MongoClient(mdb_url, ssl=True, ssl_cert_reqs=ssl.CERT_NONE)
 
 
 def db_to_use(mkt):
-  return db_name_in if mkt == IN_MKT else db_name_us
+  return DB_NAME_IN if mkt == IN_MKT else DB_NAME_US
 
 
 def get_collections(db_name):
@@ -62,13 +62,19 @@ def delete_one_record(db_name, coll_name, qry):
   return coll.delete_one(qry)
 
 
+def find_one_record(db_name, coll_name, filter=None, projection=None, sort=None):
+  db = client[db_name]
+  coll = db[coll_name]
+  return coll.find_one(filter=filter, projection=projection, sort=sort)
+
+
+def find_records(db_name, coll_name, filter=None, projection=None, sort=None):
+  db = client[db_name]
+  coll = db[coll_name]
+  return coll.find(filter=filter, projection=projection, sort=sort)
+
+
 def main():
-  # result = get_latest_record(db_to_use('us'), 'BA')
-  # print(result)
-  # result = get_collections(db_to_use('us'))
-  # result = get_indexes(db_to_use('us'), 'AAPL')
-  # print(result)
-  # add_index_on_date(db_to_use('us'), 'AAPL')
   pass
 
 
