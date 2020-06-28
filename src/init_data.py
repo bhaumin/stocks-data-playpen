@@ -19,10 +19,10 @@ def migrate_csv_data_to_db():
     files = utils.list_files(dir_path)
 
     for filename in files:
-      ticker_symbol = utils.remove_filename_ext(filename)
+      ticker = utils.remove_filename_ext(filename)
       # for index tickers, change ^ to _
-      collection = utils.convert_ticker_to_coll(ticker_symbol)
-      print(f'ticker={ticker_symbol}, collection={collection}')
+      collection = utils.convert_ticker_to_coll(ticker)
+      print(f'ticker={ticker}, collection={collection}')
 
       with open(join(dir_path, filename)) as csv_file:
         documents = utils.parse_ohlcv_csv(csv_file)
