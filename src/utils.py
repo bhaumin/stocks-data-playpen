@@ -56,7 +56,9 @@ def parse_ohlcv_csv(csv_data, last_saved_date):
       'volume': int(row['Volume'])
     })
 
-  logging.info(f'Error counts => {error_count}')
+  if error_count > 0:
+    logging.info(f'Error counts => {error_count}')
+
   return records
 
 

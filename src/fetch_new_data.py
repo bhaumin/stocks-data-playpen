@@ -63,7 +63,7 @@ def fetch(mkt, stock_ticker, period_start, period_end):
     r = s.get(url_endpoint, params=payload, allow_redirects=True)
 
     if r.status_code != 200:
-      logging.warning(f'ERROR: status_code={r.status_code}, reason={r.reason}')
+      logging.warning(f'ERROR: status_code={r.status_code}, reason={r.reason}, url={r.url}')
       return
 
     decoded_content = r.content.decode('utf-8')
@@ -74,8 +74,10 @@ def fetch(mkt, stock_ticker, period_start, period_end):
 def save(mkt, stock_ticker, data, last_saved_date):
   coll_name = utils.convert_ticker_to_coll(stock_ticker)
   docs_to_save = utils.parse_ohlcv_csv(data, last_saved_date)
-  resp = mdb.write_many_records(mdb.db_to_use(mkt), coll_name, docs_to_save)
-  logging.info(f'Inserted: {len(resp.inserted_ids)} records')
+
+  if len(docs_to_save) > 0:
+    resp = mdb.write_many_records(mdb.db_to_use(mkt), coll_name, docs_to_save)
+    logging.info(f'Inserted: {len(resp.inserted_ids)} records')
 
 
 def get_last_date(mkt, stock_ticker):
