@@ -2,7 +2,7 @@ from os import listdir
 from os.path import isfile, isdir, join
 from csv import DictReader
 from datetime import datetime
-from constants import *
+from constants import DATETIME_FORMAT, INDEX_PREFIX_EXT, INDEX_PREFIX_INT
 import time
 import logging
 
