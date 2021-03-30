@@ -41,6 +41,7 @@ def main():
 
 
 def init_logging():
+  utils.create_logs_dir(base_path)
   file_handler = logging.FileHandler(filename=join(base_path, 'logs/activity.log'))
   stdout_handler = logging.StreamHandler(sys.stdout)
   handlers = [file_handler, stdout_handler]

@@ -1,5 +1,6 @@
 from os import listdir
 from os.path import isfile, isdir, join
+from pathlib import Path
 from csv import DictReader
 from datetime import datetime
 from constants import DATETIME_FORMAT, INDEX_PREFIX_EXT, INDEX_PREFIX_INT
@@ -13,6 +14,10 @@ def list_dirs(dir_path):
 
 def list_files(dir_path):
   return [f for f in listdir(dir_path) if isfile(join(dir_path, f))]
+
+
+def create_logs_dir(dir_path):
+  Path(join(dir_path, 'logs')).mkdir(exist_ok=True)
 
 
 def remove_filename_ext(filename):
