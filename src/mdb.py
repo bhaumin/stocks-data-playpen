@@ -16,7 +16,7 @@ def get_collections(db_name):
   return db.list_collection_names()
 
 
-def add_index_on_date(db_name, coll_name):
+def add_index_on_date(mkt, db_name, coll_name):
   db = client[db_name]
   coll = db[coll_name]
 

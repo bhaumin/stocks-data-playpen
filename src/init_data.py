@@ -27,7 +27,7 @@ def migrate_csv_data_to_db():
       with open(join(dir_path, filename)) as csv_file:
         documents = utils.parse_ohlcv_csv(csv_file)
         resp = mdb.write_many_records(mdb.db_to_use(mkt), collection, documents)
-        added_index = mdb.add_index_on_date(mdb.db_to_use(mkt), collection)
+        added_index = mdb.add_index_on_date(mkt, mdb.db_to_use(mkt), collection)
         print(f'Inserted: {len(resp.inserted_ids)} records')
         print(f'Index created: {added_index}')
 
